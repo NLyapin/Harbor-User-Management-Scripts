@@ -4,7 +4,7 @@ CSV headers: Username, Password, Role
 Optional header: Project (multiple projects separated by spaces)
 
 Example:
-  python create_users_from_csv.py --csv users.csv --host https://harbor.exposedcore.com --admin-user admin --admin-pass 'secret' --project myproject1,myproject2
+  python create_users_from_csv.py --csv users.csv --host https://example.com --admin-user admin --admin-pass 'secret' --project myproject1,myproject2
 
 """
 

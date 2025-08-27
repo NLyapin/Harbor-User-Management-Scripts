@@ -1,14 +1,13 @@
 """
-Interactive password change helper for Harbor.
+Password change helper for Harbor.
 If target username is omitted, performs self password change (requires current password).
 If acting user is an admin and specifies --target, the admin can set a new password for the target user.
 
-Example (self):
-  python change_password.py --host https://harbor.exposedcore.com --user alice --prompt-pass
+Example (self, интерактивный ввод):
+  python change_password.py --host https://example.com --user alice
 
-Example (admin sets other's password):
-  python change_password.py --host https://harbor.exposedcore.com --user admin --prompt-pass --target bob
-
+Example (admin задаёт пароль пользователю):
+  python change_password.py --host https://example.com --user admin --pass secret --target bob
 """
 
 import argparse
@@ -17,6 +16,7 @@ import os
 import sys
 import harbor_client
 from harbor_client.rest import ApiException
+
 
 def make_api_client(host: str, username: str, password: str, verify_ssl: bool = True) -> harbor_client.ApiClient:
     configuration = harbor_client.Configuration()
@@ -31,7 +31,8 @@ def make_api_client(host: str, username: str, password: str, verify_ssl: bool = 
             pass
     return api_client
 
-def change_password_interactive(host: str, acting_user: str, acting_pass: str, target_username: str = None):
+
+def change_password(host: str, acting_user: str, acting_pass: str, target_username: str = None):
     api_client = make_api_client(host, acting_user, acting_pass)
     user_api = harbor_client.UserApi(api_client)
 
@@ -89,14 +90,15 @@ def change_password_interactive(host: str, acting_user: str, acting_pass: str, t
     except Exception as e:
         print(f"[ERROR] Unexpected error: {e}")
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Change Harbor password interactively',
-        usage='python3 change_password.py --host HOST --user USER [--target TARGET] --prompt-pass'
+        description='Change Harbor password',
+        usage='python3 change_password.py --host HOST --user USER [--target TARGET] [--pass PASSWORD]'
     )
     parser.add_argument('--host', required=True, help='Harbor host (http://localhost or https://harbor.example.com)')
     parser.add_argument('--user', required=False, default=os.environ.get('HARBOR_ADMIN_USER'), help='Your username')
-    parser.add_argument('--prompt-pass', action='store_true', help='Prompt for your password')
+    parser.add_argument('--pass', dest='password', required=False, help='Password for acting user (otherwise prompted interactively)')
     parser.add_argument('--target', required=False, help='Target username to change (admin only)')
     args = parser.parse_args()
 
@@ -104,9 +106,9 @@ if __name__ == '__main__':
         print("[ERROR] Acting user not provided and HARBOR_ADMIN_USER not set", file=sys.stderr)
         sys.exit(2)
 
-    if args.prompt_pass or not os.environ.get('HARBOR_ADMIN_PASS'):
-        acting_pass = getpass.getpass('Password for acting user: ')
+    if args.password:
+        acting_pass = args.password
     else:
-        acting_pass = os.environ.get('HARBOR_ADMIN_PASS')
+        acting_pass = getpass.getpass('Password for acting user: ')
 
-    change_password_interactive(args.host, args.user, acting_pass, target_username=args.target)
+    change_password(args.host, args.user, acting_pass, target_username=args.target)
