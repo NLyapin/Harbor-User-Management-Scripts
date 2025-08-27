@@ -5,7 +5,6 @@ Optional header: Project (multiple projects separated by spaces)
 
 Example:
   python create_users_from_csv.py --csv users.csv --host https://example.com --admin-user admin --admin-pass 'secret' --project myproject1,myproject2
-
 """
 
 import csv
@@ -68,7 +67,6 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                 results.append((row_no, username, 'SKIP', 'missing username/password/role'))
                 continue
 
-            # Определяем роль
             role_key = role_raw.replace(' ', '').replace('-', '').replace('_', '').lower()
             role_id = ROLE_MAP.get(role_key)
             if role_id is None:
@@ -78,8 +76,8 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                     results.append((row_no, username, 'SKIP', f'unknown role "{role_raw}"'))
                     continue
 
-            # Создаем или находим пользователя
             user_id = None
+            user_created = False
             try:
                 api_resp = user_api.search_users(username, page=1, page_size=10)
                 if api_resp:
@@ -88,7 +86,9 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                             user_id = getattr(item, 'user_id', None)
                             break
 
-                if user_id is None:
+                if user_id is not None:
+                    results.append((row_no, username, 'SKIP', f'user "{username}" already exists'))
+                else:
                     user_req = harbor_client.UserCreationReq()
                     user_req.username = username
                     user_req.password = password
@@ -99,6 +99,7 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                     search_resp = user_api.search_users(username, page=1, page_size=1)
                     if search_resp:
                         user_id = getattr(search_resp[0], 'user_id', None)
+                        user_created = True
 
                 if not user_id:
                     results.append((row_no, username, 'ERROR', 'could not determine user id after creation'))
@@ -108,8 +109,8 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                 results.append((row_no, username, 'ERROR', f'create_user failed: {e}'))
                 continue
 
-            # Обрабатываем проекты (разделитель пробел)
             projects_to_use = projects_row.split() if projects_row else default_projects_list
+            added_to_projects = False
 
             for proj_name in projects_to_use:
                 if not proj_name:
@@ -122,14 +123,16 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                             proj_req = harbor_client.ProjectReq()
                             proj_req.project_name = proj_name
                             proj_req.metadata = harbor_client.ProjectMetadata()
-                            proj_req.metadata.public = "false"  # строка
+                            proj_req.metadata.public = "false"
                             project_api.create_project(proj_req)
                             time.sleep(0.2)
                         except Exception as e2:
                             results.append((row_no, username, 'ERROR', f'project create/check failed: {e2}'))
                             continue
+                    else:
+                        results.append((row_no, username, 'WARN', f'project "{proj_name}" not found - skipping project membership'))
+                        continue
 
-                # Добавляем пользователя в проект
                 try:
                     pm = harbor_client.ProjectMember()
                     user_entity = harbor_client.UserEntity()
@@ -137,12 +140,16 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                     user_entity.username = username
                     pm.member_user = user_entity
                     pm.role_id = int(role_id)
-                    member_api.create_project_member(proj_name, project_member=pm)
+                    member_api.create_project_member(project_name_or_id=proj_name, project_member=pm)
                     results.append((row_no, username, 'OK', f'user_id={user_id} added to project {proj_name} role={role_id}'))
+                    added_to_projects = True
                 except ApiException as e:
-                    results.append((row_no, username, 'ERROR', f'add to project failed: {e}'))
+                    if e.status == 409:
+                        results.append((row_no, username, 'SKIP', f'user "{username}" already in project {proj_name}'))
+                    else:
+                        results.append((row_no, username, 'ERROR', f'add to project failed: {e}'))
 
-            if not projects_to_use:
+            if user_created and not added_to_projects:
                 results.append((row_no, username, 'OK_USER', f'user_id={user_id}'))
 
     print('RESULTS:')

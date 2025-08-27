@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-Перед запуском скриптов необходимо установить зависимости Python.  
+Перед запуском скриптов необходимо установить зависимости Python.
 Они перечислены в файле `requirements.txt`.
 
 **Установка:**
@@ -17,32 +17,31 @@ pip install -r requirements.txt
 
 **Пример содержимого `requirements.txt`:**
 
-```arduino
+```text
 git+https://github.com/container-registry/harbor-api-client.git
 ```
+
 ---
 
-## 1\. `create_users_from_csv.py`
+## 1. `create_users_from_csv.py`
 
-**Назначение:**  
+**Назначение:**
 Создает пользователей в Harbor из CSV-файла и (опционально) добавляет их в проекты с указанными ролями.
 
 **CSV формат:**
 
--   Обязательные колонки: `Username`, `Password`, `Role`
-    
--   Необязательная колонка: `Project`
-    
--   В колонке `Project` можно указывать несколько проектов через запятую, например: `project1,project2`.
-    
+* Обязательные колонки: `Username`, `Password`, `Role`
+
+* Необязательная колонка: `Project`
+
+* В колонке `Project` можно указывать несколько проектов через пробел или запятую, например: `project1 project2`.
 
 **Пример CSV:**
 
 ```csv
 Username,Password,Role,Project
-alice,Harbor12345,admin,project1,project2
-bob,Harbor12345,developer,project1
-carol,Harbor12345,guest,
+alice,Secret123!,admin,project1 project2 project3
+bob,Secret123!,developer,
 ```
 
 **Запуск:**
@@ -52,73 +51,94 @@ python3 create_users_from_csv.py \
   --host https://example.com \
   --admin-user admin \
   --admin-pass 'SECRET' \
-  --csv harbor_users.csv \
+  --csv test_users.csv \
   --project project1,project2,project3 \
   --create-project-if-missing
 ```
 
 **Флаги:**
 
--   `--host` — адрес Harbor.
-    
--   `--admin-user` — пользователь с правами администратора.
-    
--   `--admin-pass` — пароль администратора.
-    
--   `--csv` — путь к CSV-файлу.
-    
--   `--project` — дефолтный проект для всех пользователей (можно указать несколько через запятую).
-    
--   `--create-project-if-missing` — если проекта не существует, создаёт его.
-    
+* `--host` — адрес Harbor.
+
+* `--admin-user` — пользователь с правами администратора.
+
+* `--admin-pass` — пароль администратора.
+
+* `--csv` — путь к CSV-файлу.
+
+* `--project` — дефолтный проект для всех пользователей (можно указать несколько через запятую).
+
+* `--create-project-if-missing` — если проекта не существует, создаёт его.
 
 **Особенности:**
 
--   Поддержка нескольких проектов как через CSV, так и через флаг `--project`.
-    
--   Роли из CSV (admin, developer, guest, maintainer и др.) сопоставляются с ID Harbor.
-    
--   Если проект не найден и `--create-project-if-missing` не указан, выводится предупреждение.
-    
+* Поддержка нескольких проектов как через CSV, так и через флаг `--project`.
+
+* Роли из CSV (admin, developer, guest, maintainer и др.) сопоставляются с ID Harbor.
+
+* Если проект не найден и `--create-project-if-missing` не указан, выводится предупреждение.
+
+* Пользователи не создаются повторно, если уже существуют.
+
+* Пользователь добавляется только в проекты, где его ещё нет.
+
+**Пример локального запуска через HTTP:**
+
+```bash
+python3 create_users_from_csv.py \
+  --host http://localhost \
+  --admin-user admin \
+  --admin-pass Harbor12345 \
+  --csv test_users.csv
+```
+
+**Результат:**
+
+```
+(1, 'alice', 'SKIP', 'user "alice" already exists')
+(1, 'alice', 'SKIP', 'user "alice" already in project project1')
+(1, 'alice', 'SKIP', 'user "alice" already in project project2')
+(1, 'alice', 'WARN', 'project "project3" not found - skipping project membership')
+(2, 'bob', 'SKIP', 'user "bob" already exists')
+```
+
+Если включить создание проектов, которых нет:
+
+```bash
+python3 create_users_from_csv.py \
+  --host http://localhost \
+  --admin-user admin \
+  --admin-pass Harbor12345 \
+  --csv test_users.csv \
+  --create-project-if-missing
+```
+
+**Результат:**
+
+```
+(1, 'alice', 'SKIP', 'user "alice" already exists')
+(1, 'alice', 'SKIP', 'user "alice" already in project project1')
+(1, 'alice', 'SKIP', 'user "alice" already in project project2')
+(1, 'alice', 'OK', 'user_id=17 added to project project3 role=1')
+(2, 'bob', 'SKIP', 'user "bob" already exists')
+```
 
 ---
 
-## 2\. `change_password.py`
+## 2. `change_password.py`
 
-**Назначение:**  
+**Назначение:**
 Интерактивная смена пароля в Harbor.
 
--   Пользователь может сменить свой пароль.
-    
--   Админ может сменить пароль другого пользователя.
-    
+* Пользователь может сменить свой пароль.
+
+* Админ может сменить пароль другого пользователя.
 
 **Пример: смена собственного пароля**
 
 ```bash
 python3 change_password.py --host http://localhost --user alice --pass secret
 ```
-
-**Процесс:**
-
-1.  Если не был указан флаг `--pass`, скрипт запрашивает пароль действующего пользователя (`Password for acting user:`).
-    
-2.  Если это сам пользователь, запрашивает:
-    
-    -   текущий пароль (`Current password:`)
-        
-    -   новый пароль (`New password:`)
-        
-    -   подтверждение нового пароля (`Confirm new password:`)
-        
-3.  Пароль проверяется на требования Harbor:
-    
-    -   8–128 символов
-        
-    -   хотя бы одна заглавная и одна строчная буква
-        
-    -   хотя бы одна цифра
-        
 
 **Пример: админ меняет пароль другого пользователя**
 
@@ -130,28 +150,34 @@ python3 change_password.py \
   --target bob
 ```
 
-**Процесс:**
-
-1.  Если не был указан флаг `--pass`, скрипт запрашивает пароль администратора.
-    
-2.  Затем новый пароль для целевого пользователя (`New password for bob:`) и подтверждение.
-    
-3.  Пароль обновляется через API Harbor.
-    
-
-**Флаги:**
-
--   `--host` — адрес Harbor.
-    
--   `--user` — действующий пользователь (админ или обычный).
-    
--   `--pass` — ввод пароля действующего пользователя при вызове скрипта.
-    
--   `--target` — имя пользователя, чей пароль будет изменен (только для админа).
-    
-
 **Особенности:**
 
--   Скрипт аккуратно обрабатывает ошибки: неправильный пароль, несоответствие требованиям к сложности, пользователь не найден и др.
-    
--   Поддерживает Harbor API v2.0.
+* Скрипт аккуратно обрабатывает ошибки: неправильный пароль, несоответствие требованиям к сложности, пользователь не найден и др.
+
+* Поддерживает Harbor API v2.0.
+
+---
+
+## 3. Скрипт установки Harbor локально (`install_harbor.sh`)
+
+**Назначение:**
+Автоматически скачивает и разворачивает Harbor на локальной машине через HTTP (`localhost`).
+Полезен для локального тестирования скриптов управления пользователями.
+
+**Запуск:**
+
+```bash
+chmod +x install_harbor.sh
+./install_harbor.sh
+```
+
+**Что делает скрипт:**
+
+1. Проверяет наличие зависимостей: `curl`, `tar`, `docker`, `docker-compose`.
+2. Скачивает Harbor версии 2.11.0, если его ещё нет.
+3. Создаёт конфигурационный файл `harbor.yml` с `hostname: localhost` и отключённым HTTPS.
+4. Устанавливает Harbor и запускает контейнеры.
+5. После установки выводит статус контейнеров через `docker-compose ps`.
+
+**Использование:**
+Позволяет подготовить локальный Harbor для тестирования скриптов `create_users_from_csv.py` и `change_password.py` без внешнего сервера.
