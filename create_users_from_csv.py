@@ -1,10 +1,10 @@
 """
 Create users from CSV for Harbor and (optionally) add them as project members.
 CSV headers: Username, Password, Role
-Optional header: Project
+Optional header: Project (multiple projects separated by spaces)
 
 Example:
-  python create_users_from_csv.py --csv users.csv --host https://harbor.exposedcore.com --admin-user admin --admin-pass 'secret' --project myproject
+  python create_users_from_csv.py --csv users.csv --host https://harbor.exposedcore.com --admin-user admin --admin-pass 'secret' --project myproject1,myproject2
 
 """
 
@@ -35,10 +35,7 @@ ROLE_MAP = {
 
 def make_api_client(host: str, username: str, password: str, verify_ssl: bool = True) -> harbor_client.ApiClient:
     configuration = harbor_client.Configuration()
-    if host.endswith("/api/v2.0"):
-        configuration.host = host
-    else:
-        configuration.host = host.rstrip("/") + "/api/v2.0"
+    configuration.host = host.rstrip("/") + "/api/v2.0" if not host.endswith("/api/v2.0") else host
     configuration.username = username
     configuration.password = password
     api_client = harbor_client.ApiClient(configuration)
@@ -57,7 +54,6 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
     project_api = harbor_client.ProjectApi(api_client)
 
     results = []
-
     default_projects_list = [p.strip() for p in default_projects.split(",")] if default_projects else []
 
     with open(csv_file, newline='', encoding='utf-8') as fh:
@@ -112,8 +108,8 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                 results.append((row_no, username, 'ERROR', f'create_user failed: {e}'))
                 continue
 
-            # Обрабатываем проекты
-            projects_to_use = [p.strip() for p in projects_row.split(",")] if projects_row else default_projects_list
+            # Обрабатываем проекты (разделитель пробел)
+            projects_to_use = projects_row.split() if projects_row else default_projects_list
 
             for proj_name in projects_to_use:
                 if not proj_name:
@@ -126,13 +122,12 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                             proj_req = harbor_client.ProjectReq()
                             proj_req.project_name = proj_name
                             proj_req.metadata = harbor_client.ProjectMetadata()
-                            proj_req.metadata.public = "false"  # <- строка, а не булево
+                            proj_req.metadata.public = "false"  # строка
                             project_api.create_project(proj_req)
                             time.sleep(0.2)
                         except Exception as e2:
                             results.append((row_no, username, 'ERROR', f'project create/check failed: {e2}'))
                             continue
-
 
                 # Добавляем пользователя в проект
                 try:
@@ -147,7 +142,6 @@ def create_users_from_csv(csv_file: str, host: str, admin_user: str, admin_pass:
                 except ApiException as e:
                     results.append((row_no, username, 'ERROR', f'add to project failed: {e}'))
 
-            # Если проектов нет, просто выводим, что пользователь создан
             if not projects_to_use:
                 results.append((row_no, username, 'OK_USER', f'user_id={user_id}'))
 
@@ -162,7 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('--host', required=True, help='Harbor host (e.g. https://harbor.example.com)')
     parser.add_argument('--admin-user', required=False, default=os.environ.get('HARBOR_ADMIN_USER'), help='Harbor admin username')
     parser.add_argument('--admin-pass', required=False, default=os.environ.get('HARBOR_ADMIN_PASS'), help='Admin password (or set HARBOR_ADMIN_PASS env var)')
-    parser.add_argument('--project', required=False, help='Default project name to add users into (optional).')
+    parser.add_argument('--project', required=False, help='Default projects (comma-separated) to add users into if CSV field missing')
     parser.add_argument('--create-project-if-missing', action='store_true', help='Create project if it does not exist')
 
     args = parser.parse_args()
