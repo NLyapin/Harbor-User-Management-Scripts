@@ -1,0 +1,7 @@
+username,realname,email,password,role
+alice,Alice Smith,alice@example.com,Password123,developer
+bob,Bob Johnson,bob@example.com,Secret123,developer
+carol,Carol White,carol@example.com,MyPass123,developer
+dave,Dave Brown,dave@example.com,Super1234,developer
+eve,Eve Davis,eve@example.com,Welcome123,developer
+frank,Frank Miller,frank@example.com,Passw0rd9,developer
