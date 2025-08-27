@@ -1,3 +1,2 @@
 # Основные зависимости для работы со скриптами
 git+https://github.com/container-registry/harbor-api-client.git
-

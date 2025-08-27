@@ -4,6 +4,24 @@
 
 ---
 
+## Prerequisites
+
+Перед запуском скриптов необходимо установить зависимости Python.  
+Они перечислены в файле `requirements.txt`.
+
+**Установка:**
+
+```bash
+pip install -r requirements.txt
+```
+
+**Пример содержимого `requirements.txt`:**
+
+```arduino
+git+https://github.com/container-registry/harbor-api-client.git
+```
+---
+
 ## 1\. `create_users_from_csv.py`
 
 **Назначение:**  
