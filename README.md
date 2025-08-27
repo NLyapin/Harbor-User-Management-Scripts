@@ -158,7 +158,7 @@ python3 change_password.py \
 
 ---
 
-## 3. Скрипт установки Harbor локально (`install_harbor.sh`)
+## 3. Скрипт установки Harbor локально (`setup_harbor_for_testing.sh`)
 
 **Назначение:**
 Автоматически скачивает и разворачивает Harbor на локальной машине через HTTP (`localhost`).
@@ -167,8 +167,8 @@ python3 change_password.py \
 **Запуск:**
 
 ```bash
-chmod +x install_harbor.sh
-./install_harbor.sh
+chmod +x setup_harbor_for_testing.sh
+./setup_harbor_for_testing.sh
 ```
 
 **Что делает скрипт:**
